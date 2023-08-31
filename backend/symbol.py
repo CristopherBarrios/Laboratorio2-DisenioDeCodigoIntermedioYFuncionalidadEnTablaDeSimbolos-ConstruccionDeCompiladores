@@ -8,6 +8,7 @@ class Symbol:
         self.custom_error_listener = Error()
         self.ERRORS = self.custom_error_listener.ERRORS
         self.table = []
+        self.offset = 0
         self.reserv = [{'name':'out_string','type':'SELF_TYPE','kind':'','scope':'','line':'1','value':''},
                                   {'name':'x','type':'String','kind':'parameter','scope':'out_string','line':'1','value':''},
                                   {'name':'out_int','type':'SELF_TYPE','kind':'','scope':'','line':'2','value':''},
@@ -37,18 +38,15 @@ class Symbol:
         self.scopes.pop()
 
     def insert(self, name, typ, kind, scope, line, value=None):
-        scope_variables = filter(lambda x: x['scope'] == scope, self.table)
-        if (name, kind) in map(lambda x: (x['name'], x['kind']), scope_variables):
-            if kind == 'parameter':
-                for p in reversed(self.table):
-                    if p['kind'] == 'method':
-                        break
-                    elif p['name'] == name and p['kind'] == kind and p['scope'] == scope and p['line'] == line :
-                        self.custom_error_listener.error(KIND_TABLE_ERROR[kind] + ' ' + name + ' ya declarada ', line)
-            else:
-                self.custom_error_listener.error(KIND_TABLE_ERROR[kind] + ' ' + name + ' ya declarada ', line)
 
-        self.table.append({'name': name, 'type': typ, 'kind': kind, 'scope': scope, 'line': line, 'value': value})
+        scope_variables = filter(lambda x: x['scope'] == scope, self.table)
+        if (name, kind, scope) in map(lambda x: (x['name'], x['kind'], x['scope']), scope_variables) and kind != 'parameter':
+            self.custom_error_listener.error(KIND_TABLE_ERROR[kind] + ' ' + name + ' ya fue declarada ', line)
+
+        size = self.getBytes(typ)
+
+        self.table.append({'name': name, 'type': typ, 'kind': kind, 'scope': scope, 'line': line, 'value': value, 'size': size, 'address': self.offset})
+
 
     def get(self, name, line,scope=None):
         if scope is None:
@@ -70,9 +68,23 @@ class Symbol:
 
         self.custom_error_listener.error('Variable ' + name + ' no declarada', line)
 
+    def getBytes(self, type):
+        if type == 'String':
+            self.offset += 30
+            return 30
+        elif type == 'Int':
+            self.offset += 4
+            return 4
+        elif type == 'Bool':
+            self.offset += 1
+            return 1
+        elif type == 'Object' or type == 'SELF_TYPE':
+            self.offset += 100
+            return 100
+
     def get_scope(self):
         return self.scopes[-1]
 
     def __str__(self):
         table = map(lambda x: x.values(), self.table)
-        return tabulate(table, headers=['name', 'type', 'kind', 'scope', 'line', 'value'])
+        return tabulate(table, headers=['name', 'type', 'kind', 'scope', 'line', 'value', 'size', 'address'])
